@@ -13,6 +13,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
+              (os.path.join('share', package_name, 'mujoco_models'), glob('mujoco_models/*.xml')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -27,7 +28,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'pid_controller = turtle_pid.pid_controller:main'
+            'pid_controller = turtle_pid.pid_controller:main',
+            'mujoco_bridge = turtle_pid.mujoco_bridge:main'
         ],
     },
 )
