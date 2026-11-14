@@ -4,7 +4,7 @@
   <name>turtle_pid</name>
   <version>0.0.0</version>
   <description>PID go-to-goal controller for turtlesim</description>
-  <maintainer email="afthab@todo.todo">afthab</maintainer>
+  <maintainer email="afthabshibink@gmail.com">Afthab Shibin Kootteeri</maintainer>
   <license>Apache-2.0</license>
 
   <exec_depend>rclpy</exec_depend>
