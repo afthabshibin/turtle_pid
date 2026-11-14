@@ -28,6 +28,9 @@ class PidController(Node):
         self.declare_parameter('world_max', 11.08)
         self.declare_parameter('safety_margin', 0.5)
         self.declare_parameter('turn_threshold', 0.3)   
+        self.declare_parameter('use_waypoints', False)
+        self.declare_parameter('waypoints', [2.0, 2.0, 9.0, 2.0, 9.0, 9.0, 2.0, 9.0])
+        self.declare_parameter('loop_waypoints', False)
 
         # --- Controller state ---
         self.pose = None
@@ -37,7 +40,8 @@ class PidController(Node):
         self.int_dist = 0.0
         self.int_angle = 0.0
         self.goal_reached = False
-
+        self.waypoint_index = 0
+        self.all_waypoints_done = False
         # --- ROS connections ---
         self.pose_sub = self.create_subscription(
             Pose, '/turtle1/pose', self.pose_callback, 10)
@@ -69,13 +73,59 @@ class PidController(Node):
         return ((x <= low and dir_x < 0) or (x >= high and dir_x > 0)
                 or (y <= low and dir_y < 0) or (y >= high and dir_y > 0))
 
+    def current_goal(self):
+        """Return the (x, y) to drive to now, or None if there is nothing to do."""
+        if not self.param('use_waypoints'):
+            self.waypoint_index = 0          # ready to start from the first point
+            self.all_waypoints_done = False
+            return self.param('goal_x'), self.param('goal_y')
+
+        wp = self.param('waypoints')
+        if len(wp) < 2 or len(wp) % 2 != 0:
+            self.get_logger().warn('waypoints must be a list of x, y pairs',
+                                   throttle_duration_sec=2.0)
+            return None
+
+        if self.all_waypoints_done:
+            return None
+
+        count = len(wp) // 2
+        i = self.waypoint_index % count   # stay valid if the list gets shorter
+        return wp[2 * i], wp[2 * i + 1]
+
+    def reset_pid(self):
+        """Forget old errors so each new goal starts fresh."""
+        self.prev_dist_error = None
+        self.prev_angle_error = None
+        self.int_dist = 0.0
+        self.int_angle = 0.0
+
+    def next_waypoint(self):
+        """Move on to the next waypoint, or finish."""
+        count = len(self.param('waypoints')) // 2
+        self.get_logger().info(
+            f'Waypoint {self.waypoint_index % count + 1}/{count} reached')
+        self.waypoint_index += 1
+        self.reset_pid()
+        if self.waypoint_index >= count:
+            if self.param('loop_waypoints'):
+                self.waypoint_index = 0
+                self.get_logger().info('Looping back to the first waypoint')
+            else:
+                self.all_waypoints_done = True
+                self.get_logger().info('All waypoints reached!')
+
     def control_loop(self):
         """Called 20 times per second by the timer."""
         if self.pose is None:
             return  # no position received yet
 
         # 0. Safety: refuse goals outside the safe area
-        gx, gy = self.param('goal_x'), self.param('goal_y')
+        goal = self.current_goal()
+        if goal is None:
+            self.cmd_pub.publish(Twist())  # nothing to do: stay still
+            return
+        gx, gy = goal
         if not self.goal_is_safe(gx, gy):
             self.get_logger().warn(
                 f'Goal ({gx}, {gy}) is outside the safe area, not moving',
@@ -97,10 +147,12 @@ class PidController(Node):
 
         # 2. Goal reached? Stop.
         if dist_error < self.param('tolerance'):
-            if not self.goal_reached:
+            self.cmd_pub.publish(cmd)  # all zeros = stop
+            if self.param('use_waypoints'):
+                self.next_waypoint()
+            elif not self.goal_reached:
                 self.get_logger().info('Goal reached!')
                 self.goal_reached = True
-            self.cmd_pub.publish(cmd)  # all zeros = stop
             return
         self.goal_reached = False
 
