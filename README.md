@@ -49,7 +49,7 @@ python3 -m pip install --user --break-system-packages mujoco "numpy<2"
 ```bash
 mkdir -p ~/ros2_ws/src
 cd ~/ros2_ws/src
-git clone https://github.com/<your-username>/turtle_pid.git
+git clone https://github.com/afthabshibink@gmail.com/turtle_pid.git
 cd ~/ros2_ws
 colcon build --symlink-install
 source install/setup.bash
